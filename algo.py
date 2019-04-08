@@ -3,7 +3,6 @@ from __future__ import print_function
 from ortools.sat.python import cp_model
 
 
-
 def main():
     # This program tries to find an optimal assignment of workers to shifts
     # (3 shifts per day, for 7 days), subject to some constraints (see below).
@@ -11,6 +10,7 @@ def main():
     # The optimal assignment maximizes the number of fulfilled shift requests.
     num_workers = 5
     num_shifts = 3
+    workers_per_shift = [3, 2, 5]
     num_days = 7
     all_workers = range(num_workers)
     all_shifts = range(num_shifts)
@@ -39,23 +39,25 @@ def main():
 
     # Each shift is assigned to exactly one worker in .
     for d in all_days:
+        count = 0
         for s in all_shifts:
-            model.Add(sum(shifts[(n, d, s)] for n in all_workers) == 1)
+            model.Add(sum(shifts[(n, d, s)] for n in all_workers) == workers_per_shift[count])
+            count = count + 1
 
-    # Each worker works at most one shift per day.
-    for n in all_workers:
-        for d in all_days:
-            model.Add(sum(shifts[(n, d, s)] for s in all_shifts) <= 1)
+    # # Each worker works at most one shift per day.
+    # for n in all_workers:
+    #     for d in all_days:
+    #         model.Add(sum(shifts[(n, d, s)] for s in all_shifts) <= 1)
 
-    # min_shifts_assigned is the largest integer such that every worker can be
-    # assigned at least that number of shifts.
-    min_shifts_per_worker = (num_shifts * num_days) // num_workers
-    max_shifts_per_worker = min_shifts_per_worker + 1
-    for n in all_workers:
-        num_shifts_worked = sum(
-            shifts[(n, d, s)] for d in all_days for s in all_shifts)
-        model.Add(min_shifts_per_worker <= num_shifts_worked)
-        model.Add(num_shifts_worked <= max_shifts_per_worker)
+    # # min_shifts_assigned is the largest integer such that every worker can be
+    # # assigned at least that number of shifts.
+    # min_shifts_per_worker = (num_shifts * num_days) // num_workers
+    # max_shifts_per_worker = min_shifts_per_worker + 1
+    # for n in all_workers:
+    #     num_shifts_worked = sum(
+    #         shifts[(n, d, s)] for d in all_days for s in all_shifts)
+    #     model.Add(min_shifts_per_worker <= num_shifts_worked)
+    #     model.Add(num_shifts_worked <= max_shifts_per_worker)
 
     model.Maximize(
         sum(shift_requests[n][d][s] * shifts[(n, d, s)] for n in all_workers
@@ -77,8 +79,8 @@ def main():
     # Statistics.
     print()
     print('Statistics')
-    print('  - Number of shift requests met = %i' % solver.ObjectiveValue(),
-          '(out of', num_workers * min_shifts_per_worker, ')')
+    # print('  - Number of shift requests met = %i' % solver.ObjectiveValue(),
+    #       '(out of', num_workers * min_shifts_per_worker, ')')
     print('  - wall time       : %f s' % solver.WallTime())
 
 
