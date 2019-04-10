@@ -1,7 +1,8 @@
 from __future__ import division
 from __future__ import print_function
-from ortools.sat.python import cp_model
 import random
+import math
+from ortools.sat.python import cp_model
 
 
 def create_random_requests():
@@ -27,34 +28,26 @@ def main():
     # (3 shifts per day, for 7 days), subject to some constraints (see below).
     # Each worker can request to be assigned to specific shifts.
     # The optimal assignment maximizes the number of fulfilled shift requests.
-    num_workers = 100
-    num_shifts = 3
-    workers_per_shift = [30, 30, 30]
-    num_days = 7
+    # shift_requests = [[[1, 0, 1], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 1],
+    #                    [0, 1, 0], [0, 0, 1]],
+    #                   [[1, 0, 0], [0, 0, 0], [0, 1, 0], [0, 1, 0], [1, 0, 0],
+    #                    [1, 0, 1], [0, 0, 1]],
+    #                   [[0, 1, 0], [0, 1, 0], [0, 0, 0], [1, 0, 0], [0, 0, 0],
+    #                    [0, 1, 0], [1, 0, 0]],
+    #                   [[0, 0, 1], [0, 0, 1], [1, 0, 0], [0, 1, 0], [0, 0, 0],
+    #                    [1, 0, 0], [0, 0, 0]],
+    #                   [[0, 0, 1], [1, 0, 1], [0, 1, 0], [0, 1, 0], [1, 0, 0],
+    #                    [0, 1, 0], [0, 0, 0]]]
+    shift_requests = create_random_requests()
+    num_workers = len(shift_requests)
+    num_days = len(shift_requests[0])
+    num_shifts = len(shift_requests[0][0])
+    workers_per_shift = [30, 23, 27]
+    day_workers_amount = sum(workers_per_shift)
     all_workers = range(num_workers)
     all_shifts = range(num_shifts)
     all_days = range(num_days)
 
-    shift_requests = create_random_requests()
-
-    # shift_requests = [[[0, 0, 1], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 1],
-    #                    [0, 1, 0], [0, 0, 1]],
-    #                   [[0, 0, 0], [0, 0, 0], [0, 1, 0], [0, 1, 0], [1, 0, 0],
-    #                    [0, 0, 0], [0, 0, 1]],
-    #                   [[0, 1, 0], [0, 1, 0], [0, 0, 0], [1, 0, 0], [0, 0, 0],
-    #                    [0, 1, 0], [0, 0, 0]],
-    #                   [[0, 0, 1], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 1],
-    #                    [0, 1, 0], [0, 0, 1]],
-    #                   [[0, 0, 0], [0, 0, 0], [0, 1, 0], [0, 1, 0], [1, 0, 0],
-    #                    [0, 0, 0], [0, 0, 1]],
-    #                   [[0, 1, 0], [0, 1, 0], [0, 0, 0], [1, 0, 0], [0, 0, 0],
-    #                    [0, 1, 0], [0, 0, 0]],
-    #                   [[0, 0, 1], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 1],
-    #                    [0, 1, 0], [0, 0, 1]],
-    #                   [[0, 0, 0], [0, 0, 0], [0, 1, 0], [0, 1, 0], [1, 0, 0],
-    #                    [0, 0, 0], [0, 0, 1]],
-    #                   [[0, 1, 0], [0, 1, 0], [0, 0, 0], [1, 0, 0], [0, 0, 0],
-    #                    [0, 1, 0], [0, 0, 0]]]
     # Creates the model.
     model = cp_model.CpModel()
 
@@ -64,26 +57,25 @@ def main():
     for n in all_workers:
         for d in all_days:
             for s in all_shifts:
-                shifts[(n, d, s)] = model.NewBoolVar('shift_n%id%is%i' % (n, d, s))
+                shifts[(n, d, s)] = model.NewBoolVar('shift_n%id%is%i' % (n, d,
+                                                                          s))
 
-    needed_shifts_per_day = sum(workers_per_shift)
-
-    # Each shift is assigned to exactly one worker.
+    # Each shift is assigned to exactly its needed workers number.
     for d in all_days:
         count = 0
         for s in all_shifts:
             model.Add(sum(shifts[(n, d, s)] for n in all_workers) == workers_per_shift[count])
             count = count + 1
 
-    # Each worker works at most one shift per day.
-    if num_workers >= needed_shifts_per_day:
-        for n in all_workers:
-            for d in all_days:
-                model.Add(sum(shifts[(n, d, s)] for s in all_shifts) <= 1)
+    # Each worker works at most worker_max_shifts_per_day shift per day.
+    worker_max_shifts_per_day = math.ceil(day_workers_amount / num_workers)
+    for n in all_workers:
+        for d in all_days:
+            model.Add(sum(shifts[(n, d, s)] for s in all_shifts) <= worker_max_shifts_per_day)
 
     # min_shifts_assigned is the largest integer such that every worker can be
     # assigned at least that number of shifts.
-    min_shifts_per_worker = (needed_shifts_per_day * num_days) // num_workers
+    min_shifts_per_worker = (day_workers_amount * num_days) // num_workers
     max_shifts_per_worker = min_shifts_per_worker + 1
     for n in all_workers:
         num_shifts_worked = sum(
@@ -111,7 +103,8 @@ def main():
     # Statistics.
     print()
     print('Statistics')
-    print('  - Number of shift requests met = %i' % solver.ObjectiveValue())
+    print('  - Number of shift requests met = %i' % solver.ObjectiveValue(),
+          '(out of', day_workers_amount * num_days, ')')
     print('  - wall time       : %f s' % solver.WallTime())
 
 
