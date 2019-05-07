@@ -64,14 +64,16 @@ def main():
     for d in all_days:
         count = 0
         for s in all_shifts:
-            model.Add(sum(shifts[(n, d, s)] for n in all_workers) == workers_per_shift[count])
+            model.Add(sum(shifts[(n, d, s)]
+                          for n in all_workers) == workers_per_shift[count])
             count = count + 1
 
     # Each worker works at most worker_max_shifts_per_day shift per day.
     worker_max_shifts_per_day = math.ceil(day_workers_amount / num_workers)
     for n in all_workers:
         for d in all_days:
-            model.Add(sum(shifts[(n, d, s)] for s in all_shifts) <= worker_max_shifts_per_day)
+            model.Add(sum(shifts[(n, d, s)]
+                          for s in all_shifts) <= worker_max_shifts_per_day)
 
     # min_shifts_assigned is the largest integer such that every worker can be
     # assigned at least that number of shifts.
@@ -97,7 +99,8 @@ def main():
                     if shift_requests[n][d][s] == 1:
                         print('Worker', n, 'works shift', s, '(requested).')
                     else:
-                        print('Worker', n, 'works shift', s, '(not requested).')
+                        print('Worker', n, 'works shift',
+                              s, '(not requested).')
         print()
 
     # Statistics.
